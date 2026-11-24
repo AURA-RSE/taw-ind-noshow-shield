@@ -1,0 +1,12 @@
+{
+  "name": "taw-ind-noshow-shield",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NoShow Shield: smart appointment reminders with one-tap reschedule and automatic waitlist refill. n8n + Twilio + Google Calendar.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "build": "node scripts/build-workflows.js"
+  },
+  "engines": { "node": ">=18" },
+  "license": "MIT"
+}

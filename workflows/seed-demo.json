@@ -1,0 +1,300 @@
+{
+  "id": "noshowSeed01",
+  "name": "NoShow Shield – Seed demo data",
+  "nodes": [
+    {
+      "id": "node-1",
+      "name": "Seed demo data",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "noshow-seed",
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "noshow-seed",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-2",
+      "name": "Plan demo data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ===== Settings (edit here) =====\nconst CONFIG = {\n  clinicName: 'Harbourview Family Clinic',\n  timezone: 'Africa/Lagos',\n  calendarId: \"YOUR_CALENDAR_ID@group.calendar.google.com\",\n  baseUrl: \"https://YOUR-N8N-PUBLIC-URL\",\n  secret: \"CHANGE_ME_LONG_RANDOM_SECRET\",\n  channel: \"whatsapp\", // 'whatsapp' | 'sms' | 'outbox'\n};\nconst TEST_PHONE = \"+15550100101\"; // demo data sends only to this opted-in test number\n\n// ===== NoShow Shield library (generated from src/noshow.js, do not edit here) =====\n// NoShow Shield: core logic. Runs in the tests (node) and inside n8n Code nodes\n// (scripts/build-workflows.js copies it in). No dependencies, no Node built-ins:\n// HMAC-SHA256 is implemented below so it works in n8n's sandbox without extra settings.\n\nconst NS_DEFAULTS = {\n  clinicName: 'Harbourview Family Clinic',\n  timezone: 'Africa/Lagos',\n  calendarId: '',\n  baseUrl: '', // public n8n URL, e.g. https://x.trycloudflare.com\n  secret: '', // signs one-tap links\n  channel: 'whatsapp', // 'sms' | 'whatsapp' | 'outbox'\n  reminderHours: [24, 2],\n  slotMinutes: 30,\n  hours: { 1: [8, 17], 2: [8, 17], 3: [8, 17], 4: [8, 17], 5: [8, 17], 6: [9, 13] }, // weekday -> [open, close)\n  searchDays: 7,\n  maxSlotsShown: 6,\n  linkTtlHours: 72,\n  offerTtlMinutes: 60,\n  offerFanout: 2, // how many waitlisted patients get each freed slot (first to claim wins)\n};\n\n// ---------- HMAC-SHA256 (pure JS) ----------\nfunction nsSha256(bytes) {\n  const K = [0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da, 0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2];\n  const H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];\n  const l = bytes.length;\n  const withPad = new Uint8Array(((l + 9 + 63) >> 6) << 6);\n  withPad.set(bytes);\n  withPad[l] = 0x80;\n  const bits = l * 8;\n  withPad[withPad.length - 4] = (bits >>> 24) & 255;\n  withPad[withPad.length - 3] = (bits >>> 16) & 255;\n  withPad[withPad.length - 2] = (bits >>> 8) & 255;\n  withPad[withPad.length - 1] = bits & 255;\n  const w = new Array(64);\n  const rotr = (x, n) => (x >>> n) | (x << (32 - n));\n  for (let off = 0; off < withPad.length; off += 64) {\n    for (let i = 0; i < 16; i++) w[i] = (withPad[off + i * 4] << 24) | (withPad[off + i * 4 + 1] << 16) | (withPad[off + i * 4 + 2] << 8) | withPad[off + i * 4 + 3];\n    for (let i = 16; i < 64; i++) {\n      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3);\n      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10);\n      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;\n    }\n    let [a, b, c, d, e, f, g, h] = H;\n    for (let i = 0; i < 64; i++) {\n      const t1 = (h + (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;\n      const t2 = ((rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;\n      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;\n    }\n    H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;\n    H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;\n  }\n  const out = new Uint8Array(32);\n  H.forEach((v, i) => { out[i * 4] = v >>> 24; out[i * 4 + 1] = (v >>> 16) & 255; out[i * 4 + 2] = (v >>> 8) & 255; out[i * 4 + 3] = v & 255; });\n  return out;\n}\n\nfunction nsUtf8(str) {\n  const out = [];\n  for (const ch of String(str)) {\n    let c = ch.codePointAt(0);\n    if (c < 0x80) out.push(c);\n    else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));\n    else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));\n    else out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));\n  }\n  return new Uint8Array(out);\n}\n\nfunction nsHmac(key, msg) {\n  let k = nsUtf8(key);\n  if (k.length > 64) k = nsSha256(k);\n  const pad = (byte) => { const p = new Uint8Array(64); for (let i = 0; i < 64; i++) p[i] = (k[i] || 0) ^ byte; return p; };\n  const m = nsUtf8(msg);\n  const inner = new Uint8Array(64 + m.length); inner.set(pad(0x36)); inner.set(m, 64);\n  const ih = nsSha256(inner);\n  const outer = new Uint8Array(96); outer.set(pad(0x5c)); outer.set(ih, 64);\n  return nsSha256(outer);\n}\n\nconst B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';\nfunction nsB64url(bytes) {\n  let s = '';\n  for (let i = 0; i < bytes.length; i += 3) {\n    const n = (bytes[i] << 16) | ((bytes[i + 1] || 0) << 8) | (bytes[i + 2] || 0);\n    s += B64[(n >> 18) & 63] + B64[(n >> 12) & 63] + (i + 1 < bytes.length ? B64[(n >> 6) & 63] : '') + (i + 2 < bytes.length ? B64[n & 63] : '');\n  }\n  return s;\n}\nfunction nsB64urlDecode(s) {\n  const bytes = [];\n  let buf = 0, bits = 0;\n  for (const ch of s) {\n    const v = B64.indexOf(ch);\n    if (v < 0) return null;\n    buf = (buf << 6) | v; bits += 6;\n    if (bits >= 8) { bits -= 8; bytes.push((buf >> bits) & 255); }\n  }\n  return new Uint8Array(bytes);\n}\nfunction nsUtf8Decode(bytes) {\n  let s = '', i = 0;\n  while (i < bytes.length) {\n    const b = bytes[i++];\n    if (b < 0x80) s += String.fromCharCode(b);\n    else if (b < 0xe0) s += String.fromCharCode(((b & 31) << 6) | (bytes[i++] & 63));\n    else if (b < 0xf0) s += String.fromCharCode(((b & 15) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63));\n    else { const c = ((b & 7) << 18) | ((bytes[i++] & 63) << 12) | ((bytes[i++] & 63) << 6) | (bytes[i++] & 63); s += String.fromCodePoint(c); }\n  }\n  return s;\n}\n\n// Signed, expiring token for one-tap links. Tampering or expiry -> null.\nfunction signToken(payload, secret) {\n  if (!secret) throw new Error('link secret not configured');\n  const body = nsB64url(nsUtf8(JSON.stringify(payload)));\n  return body + '.' + nsB64url(nsHmac(secret, body).slice(0, 16));\n}\nfunction verifyToken(token, secret, now) {\n  if (!token || !secret || typeof token !== 'string') return null;\n  const [body, sig] = token.split('.');\n  if (!body || !sig || nsB64url(nsHmac(secret, body).slice(0, 16)) !== sig) return null;\n  let payload;\n  try { payload = JSON.parse(nsUtf8Decode(nsB64urlDecode(body))); } catch (e) { return null; }\n  if (!payload || !payload.exp || (now || new Date()).getTime() > payload.exp) return null;\n  return payload;\n}\n\n// ---------- time helpers ----------\nfunction nsParts(date, tz) {\n  const f = new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', weekday: 'short', hourCycle: 'h23' });\n  const p = Object.fromEntries(f.formatToParts(date).map((x) => [x.type, x.value]));\n  return { y: +p.year, m: +p.month, d: +p.day, h: +p.hour, min: +p.minute, wd: { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 }[p.weekday] };\n}\n// Local wall-clock time in tz -> Date (UTC instant).\nfunction nsZoned(y, m, d, h, min, tz) {\n  let guess = Date.UTC(y, m - 1, d, h, min);\n  for (let i = 0; i < 2; i++) {\n    const p = nsParts(new Date(guess), tz);\n    const diff = Date.UTC(p.y, p.m - 1, p.d, p.h, p.min) - Date.UTC(y, m - 1, d, h, min);\n    guess -= diff;\n  }\n  return new Date(guess);\n}\nfunction nsSpoken(date, tz) {\n  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }).format(date);\n}\nfunction nsDateOnly(date, tz) {\n  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, weekday: 'short', day: 'numeric', month: 'short' }).format(date);\n}\nfunction nsTimeOnly(date, tz) {\n  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(date);\n}\n\n// ---------- appointments ----------\nfunction nsNormalizePhone(raw) {\n  const p = String(raw || '').replace(/[^+0-9]/g, '');\n  const e = p.startsWith('+') ? p : (p.startsWith('0') ? '+234' + p.slice(1) : '+' + p);\n  return /^\\+[1-9][0-9]{7,14}$/.test(e) ? e : '';\n}\n\n// Appointment details live in the Calendar event description as \"Key: value\" lines.\nfunction parseAppointment(ev) {\n  if (!ev || !ev.id || !ev.start || !ev.start.dateTime) return null;\n  const meta = {};\n  for (const line of String(ev.description || '').split(/\\r?\\n/)) {\n    const m = line.match(/^\\s*([A-Za-z_ ]+?)\\s*:\\s*(.+?)\\s*$/);\n    if (m) meta[m[1].toLowerCase().replace(/\\s+/g, '_')] = m[2];\n  }\n  return {\n    id: ev.id,\n    summary: ev.summary || '',\n    start: new Date(ev.start.dateTime),\n    end: new Date((ev.end && ev.end.dateTime) || ev.start.dateTime),\n    patient: meta.patient || (ev.summary || '').split(/[–-]/)[0].trim() || 'Patient',\n    phone: nsNormalizePhone(meta.phone),\n    service: meta.service || 'Appointment',\n    consent: /^(yes|true|y)$/i.test(meta.consent || ''),\n    status: (meta.status || 'booked').toLowerCase(),\n    cancelled: ev.status === 'cancelled',\n    description: ev.description || '',\n  };\n}\n\nfunction cfgOf(config) {\n  return Object.assign({}, NS_DEFAULTS, config || {});\n}\n\nfunction linkFor(cfg, payload, action, extra) {\n  const t = signToken(payload, cfg.secret);\n  let u = `${cfg.baseUrl.replace(/\\/$/, '')}/webhook/noshow?t=${encodeURIComponent(t)}`;\n  if (action) u += `&a=${action}`;\n  if (extra) u += extra;\n  return u;\n}\n\nfunction firstName(name) {\n  return String(name || '').split(/\\s+/)[0] || 'there';\n}\n\n// Which reminders are due now? Windows: the 24h reminder goes out when 2h < time-to-start <= 24h,\n// the 2h reminder when 0 < time-to-start <= 2h. A reminder already in the Outbox is never re-sent,\n// so a missed run catches up and an extra run does nothing.\nfunction dueReminders(events, outboxRows, now, config) {\n  const cfg = cfgOf(config);\n  const offsets = cfg.reminderHours.slice().sort((a, b) => b - a);\n  const sent = new Set((outboxRows || []).filter((r) => r && r.appointment_id && /^(sent|queued|logged|delivered)$/i.test(String(r.status || ''))).map((r) => `${r.appointment_id}|${r.kind}`));\n  const ops = [];\n  const skipped = [];\n  for (const ev of events || []) {\n    const a = parseAppointment(ev);\n    if (!a || a.cancelled || a.status === 'cancelled') continue;\n    const hrs = (a.start - now) / 3600000;\n    if (hrs <= 0) continue;\n    for (let i = 0; i < offsets.length; i++) {\n      const upper = offsets[i];\n      const lower = offsets[i + 1] || 0;\n      if (hrs > upper || hrs <= lower) continue;\n      const kind = `reminder_${upper}h`;\n      if (sent.has(`${a.id}|${kind}`)) break;\n      if (!a.consent) { skipped.push({ id: a.id, reason: 'no consent' }); break; }\n      if (!a.phone) { skipped.push({ id: a.id, reason: 'no valid phone' }); break; }\n      const link = linkFor(cfg, { k: 'appt', id: a.id, exp: a.start.getTime() + 3600000 });\n      const when = nsSpoken(a.start, cfg.timezone);\n      const body = `Hi ${firstName(a.patient)}, this is ${cfg.clinicName}. Reminder: your ${a.service} is ${upper <= 2 ? 'today at ' + nsTimeOnly(a.start, cfg.timezone) : 'on ' + when}.\\nConfirm, reschedule or cancel in one tap: ${link}`;\n      ops.push(messageOp(cfg, { to: a.phone, body, kind, appointment_id: a.id, link, patient: a.patient, vars: { 1: nsDateOnly(a.start, cfg.timezone), 2: nsTimeOnly(a.start, cfg.timezone) } }, now));\n      break;\n    }\n  }\n  return { ops, skipped };\n}\n\n// Routes a message: 'sms' sends the full text, 'whatsapp' sends the approved appointment-reminder\n// template (business-initiated WhatsApp messages must be templates), 'outbox' only logs it.\n// Waitlist offers have no approved template, so on the WhatsApp channel they're logged to the Outbox.\nfunction messageOp(cfg, m, now) {\n  let op = cfg.channel === 'sms' ? 'sms' : cfg.channel === 'whatsapp' ? 'whatsapp' : 'outbox';\n  let note = '';\n  if (op === 'whatsapp' && m.kind !== 'reminder_24h' && m.kind !== 'reminder_2h') { op = 'outbox'; note = 'no approved WhatsApp template for this message type'; }\n  return { op, channel: cfg.channel, ...m, note, created_at: now.toISOString() };\n}\n\n// Free slots in clinic hours over the next N days that don't overlap any busy event.\nfunction freeSlots(busyEvents, now, config, opts) {\n  const cfg = cfgOf(config);\n  const o = opts || {};\n  const durMin = o.durationMinutes || cfg.slotMinutes;\n  const busy = (busyEvents || [])\n    .filter((e) => e && e.status !== 'cancelled' && e.start && e.start.dateTime && e.id !== o.excludeId)\n    .map((e) => [new Date(e.start.dateTime).getTime(), new Date((e.end && e.end.dateTime) || e.start.dateTime).getTime()]);\n  const out = [];\n  const earliest = now.getTime() + 60 * 60000; // at least 1h notice\n  const today = nsParts(now, cfg.timezone);\n  for (let day = 0; day <= cfg.searchDays && out.length < (o.limit || cfg.maxSlotsShown); day++) {\n    const base = nsZoned(today.y, today.m, today.d, 12, 0, cfg.timezone).getTime() + day * 86400000;\n    const p = nsParts(new Date(base), cfg.timezone);\n    const hrs = cfg.hours[p.wd];\n    if (!hrs) continue;\n    for (let mins = hrs[0] * 60; mins + durMin <= hrs[1] * 60; mins += cfg.slotMinutes) {\n      const s = nsZoned(p.y, p.m, p.d, Math.floor(mins / 60), mins % 60, cfg.timezone).getTime();\n      const e = s + durMin * 60000;\n      if (s < earliest) continue;\n      if (busy.some(([bs, be]) => s < be && e > bs)) continue;\n      out.push(new Date(s));\n      if (out.length >= (o.limit || cfg.maxSlotsShown)) break;\n    }\n  }\n  return out;\n}\n\nfunction isSlotFree(busyEvents, start, end, excludeId) {\n  const s = start.getTime(), e = end.getTime();\n  return !(busyEvents || []).some((ev) => ev && ev.status !== 'cancelled' && ev.id !== excludeId && ev.start && ev.start.dateTime && s < new Date((ev.end && ev.end.dateTime) || ev.start.dateTime).getTime() && e > new Date(ev.start.dateTime).getTime());\n}\n\nfunction inClinicHours(start, end, cfg) {\n  const p = nsParts(start, cfg.timezone), q = nsParts(new Date(end.getTime() - 1), cfg.timezone);\n  const hrs = cfg.hours[p.wd];\n  if (!hrs || p.d !== q.d) return false;\n  const sm = p.h * 60 + p.min, em = q.h * 60 + q.min + 1;\n  return sm >= hrs[0] * 60 && em <= hrs[1] * 60;\n}\n\n// Waitlist rows: waitlist_id, patient, phone, service, preference (morning|afternoon|any), consent, added_at, active\nfunction pickWaitlist(waitlist, activityRows, slotStart, config) {\n  const cfg = cfgOf(config);\n  const booked = new Set((activityRows || []).filter((r) => r && r.action === 'waitlist_booked').map((r) => String(r.waitlist_id)));\n  const offeredThisSlot = new Set((activityRows || []).filter((r) => r && r.action === 'waitlist_offered' && r.slot_start === slotStart.toISOString()).map((r) => String(r.waitlist_id)));\n  const hour = nsParts(slotStart, cfg.timezone).h;\n  return (waitlist || [])\n    .filter((w) => w && w.waitlist_id && /^(yes|true|y)$/i.test(String(w.active || 'yes')) && /^(yes|true|y)$/i.test(String(w.consent || '')))\n    .filter((w) => nsNormalizePhone(w.phone))\n    .filter((w) => !booked.has(String(w.waitlist_id)) && !offeredThisSlot.has(String(w.waitlist_id)))\n    .filter((w) => { const pref = String(w.preference || 'any').toLowerCase(); return pref === 'any' || (pref === 'morning' ? hour < 12 : hour >= 12); })\n    .sort((a, b) => String(a.added_at || '').localeCompare(String(b.added_at || '')))\n    .slice(0, cfg.offerFanout);\n}\n\nfunction offerOps(freed, waitlist, activityRows, now, cfg) {\n  const ops = [];\n  for (const w of pickWaitlist(waitlist, activityRows, freed.start, cfg)) {\n    const payload = { k: 'offer', wid: String(w.waitlist_id), s: freed.start.getTime(), e: freed.end.getTime(), svc: w.service || freed.service, exp: Math.min(now.getTime() + cfg.offerTtlMinutes * 60000, freed.start.getTime()) };\n    const link = linkFor(cfg, payload);\n    const body = `Hi ${firstName(w.patient)}, a ${w.service || 'appointment'} slot just opened at ${cfg.clinicName}: ${nsSpoken(freed.start, cfg.timezone)}. First to tap gets it (offer ends in ${cfg.offerTtlMinutes} min): ${link}`;\n    ops.push(messageOp(cfg, { to: nsNormalizePhone(w.phone), body, kind: 'waitlist_offer', appointment_id: '', waitlist_id: String(w.waitlist_id), link, patient: w.patient, vars: { 1: nsDateOnly(freed.start, cfg.timezone), 2: nsTimeOnly(freed.start, cfg.timezone) } }, now));\n    ops.push(activity('waitlist_offered', { waitlist_id: String(w.waitlist_id), slot_start: freed.start.toISOString(), detail: `offered to ${w.patient}` }, now));\n  }\n  if (!ops.length) ops.push(activity('slot_freed_no_match', { slot_start: freed.start.toISOString(), detail: 'no matching waitlist entry' }, now));\n  return ops;\n}\n\nfunction activity(action, fields, now) {\n  return { op: 'activity', row: Object.assign({ at: now.toISOString(), action, appointment_id: '', waitlist_id: '', slot_start: '', detail: '' }, fields) };\n}\n\nfunction calendarOp(cfg, method, eventId, body) {\n  const base = `/calendars/${encodeURIComponent(cfg.calendarId)}/events`;\n  return { op: 'calendar', method, path: eventId ? `${base}/${encodeURIComponent(eventId)}` : base, body: body || null };\n}\n\nfunction setStatus(description, status) {\n  const lines = String(description || '').split(/\\r?\\n/).filter((l) => !/^\\s*status\\s*:/i.test(l));\n  lines.push(`Status: ${status}`);\n  return lines.join('\\n');\n}\n\n// ---------- HTML pages ----------\nfunction esc(s) {\n  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\n}\nfunction page(cfg, title, bodyHtml) {\n  return `<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>${esc(title)} · ${esc(cfg.clinicName)}</title><style>body{margin:0;font:16px/1.5 system-ui,-apple-system,sans-serif;background:#f5f4f0;color:#1d1d1b}main{max-width:440px;margin:0 auto;padding:32px 20px}.card{background:#fff;border:1px solid #e4e2dc;border-radius:14px;padding:22px}h1{font-size:22px;margin:0 0 8px}p{margin:8px 0}.muted{color:#6b6a66;font-size:14px}.btn{display:block;text-align:center;text-decoration:none;font-weight:600;padding:13px;border-radius:10px;margin-top:10px;background:#0b6e4f;color:#fff}.btn.alt{background:#fff;color:#0b6e4f;border:1px solid #0b6e4f}.btn.warn{background:#fff;color:#b42318;border:1px solid #e4b4ae}.slots a{display:block;padding:11px;border:1px solid #e4e2dc;border-radius:10px;margin-top:8px;text-decoration:none;color:#1d1d1b}</style></head><body><main><p class=\"muted\">${esc(cfg.clinicName)}</p><div class=\"card\">${bodyHtml}</div><p class=\"muted\">This page never shows medical information.</p></main></body></html>`;\n}\n\n// ---------- the one-tap link handler ----------\n// query: { t, a, s }. events: Calendar events (now-1h .. +8 days). Returns { status, html, ops }.\nfunction handleLink(query, events, waitlist, activityRows, now, config) {\n  const cfg = cfgOf(config);\n  const tz = cfg.timezone;\n  const tok = verifyToken(query && query.t, cfg.secret, now);\n  if (!tok) return { status: 'invalid', html: page(cfg, 'Link expired', '<h1>This link has expired</h1><p>Please call the clinic to make changes to your appointment.</p>'), ops: [] };\n  const action = String((query && query.a) || 'view');\n  const self = (a, extra) => linkFor(cfg, tok, a, extra);\n\n  if (tok.k === 'appt') {\n    const ev = (events || []).find((e) => e.id === tok.id);\n    const appt = parseAppointment(ev);\n    if (!appt || appt.cancelled || appt.status === 'cancelled') return { status: 'gone', html: page(cfg, 'Not found', '<h1>Appointment not found</h1><p>It may already have been cancelled or moved. Please call the clinic if you need help.</p>'), ops: [] };\n    const when = nsSpoken(appt.start, tz);\n    const head = `<h1>${esc(appt.service)}</h1><p><strong>${esc(when)}</strong></p><p class=\"muted\">For ${esc(firstName(appt.patient))}</p>`;\n\n    if (action === 'view') {\n      return { status: 'ok', html: page(cfg, 'Your appointment', `${head}${appt.status === 'confirmed' ? '<p>✅ You have confirmed this appointment.</p>' : `<a class=\"btn\" href=\"${esc(self('confirm'))}\">Confirm I'll attend</a>`}<a class=\"btn alt\" href=\"${esc(self('reschedule'))}\">Reschedule</a><a class=\"btn warn\" href=\"${esc(self('cancel'))}\">Cancel</a>`), ops: [activity('link_opened', { appointment_id: appt.id }, now)] };\n    }\n    if (action === 'confirm') {\n      return {\n        status: 'confirmed',\n        html: page(cfg, 'Confirmed', `${head}<p>✅ Thank you, you're confirmed. See you then!</p><a class=\"btn alt\" href=\"${esc(self('reschedule'))}\">Need to reschedule instead?</a>`),\n        ops: appt.status === 'confirmed' ? [] : [calendarOp(cfg, 'PATCH', appt.id, { description: setStatus(appt.description, 'confirmed'), colorId: '10' }), activity('confirmed', { appointment_id: appt.id }, now)],\n      };\n    }\n    if (action === 'reschedule') {\n      const slots = freeSlots(events, now, cfg, { excludeId: appt.id, durationMinutes: Math.round((appt.end - appt.start) / 60000) });\n      const list = slots.length ? `<div class=\"slots\">${slots.map((s) => `<a href=\"${esc(self('move', '&s=' + s.getTime()))}\">${esc(nsSpoken(s, tz))}</a>`).join('')}</div>` : '<p>No free slots in the next week. Please call the clinic.</p>';\n      return { status: 'choose', html: page(cfg, 'Reschedule', `${head}<p>Pick a new time:</p>${list}<a class=\"btn alt\" href=\"${esc(self('view'))}\">Keep my current time</a>`), ops: [] };\n    }\n    if (action === 'move') {\n      const s = new Date(Number(query.s));\n      const e = new Date(s.getTime() + (appt.end - appt.start));\n      if (!(s.getTime() > now.getTime() + 30 * 60000) || !inClinicHours(s, e, cfg)) return { status: 'bad_slot', html: page(cfg, 'Unavailable', `${head}<p>That time isn't available any more.</p><a class=\"btn\" href=\"${esc(self('reschedule'))}\">See other times</a>`), ops: [] };\n      if (!isSlotFree(events, s, e, appt.id)) return { status: 'taken', html: page(cfg, 'Taken', `${head}<p>Sorry, someone just booked that time.</p><a class=\"btn\" href=\"${esc(self('reschedule'))}\">See other times</a>`), ops: [] };\n      const freed = { start: appt.start, end: appt.end, service: appt.service };\n      return {\n        status: 'moved',\n        html: page(cfg, 'Rescheduled', `<h1>${esc(appt.service)}</h1><p>✅ Moved to <strong>${esc(nsSpoken(s, tz))}</strong>.</p><p class=\"muted\">You'll get a reminder before your new time.</p>`),\n        ops: [\n          calendarOp(cfg, 'PATCH', appt.id, { start: { dateTime: s.toISOString() }, end: { dateTime: e.toISOString() }, description: setStatus(appt.description, 'rescheduled') }),\n          activity('rescheduled', { appointment_id: appt.id, slot_start: s.toISOString(), detail: `from ${appt.start.toISOString()}` }, now),\n          ...offerOps(freed, waitlist, activityRows, now, cfg),\n        ],\n      };\n    }\n    if (action === 'cancel') {\n      return { status: 'confirm_cancel', html: page(cfg, 'Cancel?', `${head}<p>Cancel this appointment? Your slot will be offered to someone on the waitlist.</p><a class=\"btn warn\" href=\"${esc(self('cancel_yes'))}\">Yes, cancel it</a><a class=\"btn alt\" href=\"${esc(self('reschedule'))}\">Reschedule instead</a>`), ops: [] };\n    }\n    if (action === 'cancel_yes') {\n      return {\n        status: 'cancelled',\n        html: page(cfg, 'Cancelled', `<h1>${esc(appt.service)}</h1><p>Your appointment on ${esc(when)} is cancelled. Thanks for letting us know. Your slot will go to someone on the waitlist.</p>`),\n        ops: [calendarOp(cfg, 'DELETE', appt.id), activity('cancelled', { appointment_id: appt.id, slot_start: appt.start.toISOString() }, now), ...offerOps({ start: appt.start, end: appt.end, service: appt.service }, waitlist, activityRows, now, cfg)],\n      };\n    }\n  }\n\n  if (tok.k === 'offer') {\n    const s = new Date(tok.s), e = new Date(tok.e);\n    const w = (waitlist || []).find((r) => String(r.waitlist_id) === String(tok.wid));\n    const head = `<h1>${esc(tok.svc || 'Appointment')}</h1><p><strong>${esc(nsSpoken(s, tz))}</strong></p>`;\n    const alreadyBooked = (activityRows || []).some((r) => r && r.action === 'waitlist_booked' && String(r.waitlist_id) === String(tok.wid) && r.slot_start === s.toISOString());\n    if (alreadyBooked) return { status: 'booked', html: page(cfg, 'Booked', `${head}<p>✅ This slot is already yours.</p>`), ops: [] };\n    if (!w) return { status: 'gone', html: page(cfg, 'Unavailable', `${head}<p>This offer is no longer available.</p>`), ops: [] };\n    if (!isSlotFree(events, s, e)) return { status: 'taken', html: page(cfg, 'Taken', `${head}<p>Sorry, someone else took this slot first. You're still on the waitlist and we'll message you when another opens.</p>`), ops: [] };\n    if (action === 'view') return { status: 'offer', html: page(cfg, 'Slot available', `${head}<p>This slot is available for ${esc(firstName(w.patient))}.</p><a class=\"btn\" href=\"${esc(self('claim'))}\">Book it</a>`), ops: [] };\n    if (action === 'claim') {\n      const description = [`Patient: ${w.patient}`, `Phone: ${nsNormalizePhone(w.phone)}`, `Service: ${tok.svc || w.service || 'Appointment'}`, 'Consent: yes', 'Status: booked', `Source: waitlist ${w.waitlist_id}`].join('\\n');\n      return {\n        status: 'booked',\n        html: page(cfg, 'Booked', `${head}<p>✅ Booked for ${esc(firstName(w.patient))}. You'll get a reminder beforehand.</p>`),\n        ops: [calendarOp(cfg, 'POST', null, { summary: `${w.patient} – ${tok.svc || w.service || 'Appointment'}`, description, start: { dateTime: s.toISOString() }, end: { dateTime: e.toISOString() } }), activity('waitlist_booked', { waitlist_id: String(w.waitlist_id), slot_start: s.toISOString(), detail: `booked from waitlist` }, now)],\n      };\n    }\n  }\n  return { status: 'unknown', html: page(cfg, 'Not available', '<h1>Something went wrong</h1><p>Please call the clinic.</p>'), ops: [] };\n}\n\n// Demo data: fictional patients, all messages go to the one opted-in test phone.\nfunction seedOps(now, config, testPhone) {\n  const cfg = cfgOf(config);\n  const phone = nsNormalizePhone(testPhone);\n  const half = 30 * 60000;\n  const at = (hoursAhead) => Math.ceil((now.getTime() + hoursAhead * 3600000) / half) * half; // next :00/:30\n  const mk = (name, service, startMs) => calendarOp(cfg, 'POST', null, {\n    summary: `${name} – ${service}`,\n    description: [`Patient: ${name}`, `Phone: ${phone}`, `Service: ${service}`, 'Consent: yes', 'Status: booked'].join('\\n'),\n    start: { dateTime: new Date(startMs).toISOString() },\n    end: { dateTime: new Date(startMs + cfg.slotMinutes * 60000).toISOString() },\n  });\n  return {\n    ops: [\n      mk('Ada Test', 'Check-up', at(1.5)),\n      mk('Bayo Test', 'Dental cleaning', at(20)),\n      mk('Chi Test', 'Follow-up visit', at(30)),\n    ],\n    waitlist: [\n      { waitlist_id: 'W-001', patient: 'Dami Test', phone, service: 'Check-up', preference: 'any', consent: 'yes', added_at: new Date(now.getTime() - 86400000).toISOString(), active: 'yes' },\n      { waitlist_id: 'W-002', patient: 'Efe Test', phone, service: 'Any', preference: 'afternoon', consent: 'yes', added_at: new Date(now.getTime() - 3600000).toISOString(), active: 'yes' },\n    ],\n  };\n}\n\n// ===== This node =====\nconst key = ($('Seed demo data').first().json.query || {}).key;\nif (key !== CONFIG.secret.slice(0, 12)) return [{ json: { ok: false, error: 'wrong key', ops: [] } }];\nconst seed = seedOps(new Date(), CONFIG, TEST_PHONE);\nconst ops = [...seed.ops, ...seed.waitlist.map((w) => ({ op: 'waitlist', row: w }))];\nreturn [{ json: { ok: true, appointments: seed.ops.map((o) => o.body.summary + ' @ ' + o.body.start.dateTime), waitlist: seed.waitlist.map((w) => w.waitlist_id + ' ' + w.patient + ' (' + w.preference + ')'), ops } }];"
+      }
+    },
+    {
+      "id": "node-3",
+      "name": "Reply",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: $json.ok, error: $json.error, appointments: $json.appointments, waitlist: $json.waitlist }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "node-4",
+      "name": "Split",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return ($json.ops || []).map((o) => ({ json: o }));"
+      }
+    },
+    {
+      "id": "node-5",
+      "name": "Route",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        880,
+        300
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "node-6",
+                    "leftValue": "={{ $json.op }}",
+                    "rightValue": "calendar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "calendar"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "node-7",
+                    "leftValue": "={{ $json.op }}",
+                    "rightValue": "waitlist",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "waitlist"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "node-8",
+      "name": "Create appointment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://www.googleapis.com/calendar/v3' + $json.path }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "clinicTriageGsa1",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "id": "node-9",
+      "name": "Waitlist row",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        400
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "return { json: $json.row };"
+      }
+    },
+    {
+      "id": "node-10",
+      "name": "Append to Waitlist",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1320,
+        400
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Waitlist"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {
+          "useAppend": true
+        }
+      },
+      "credentials": {
+        "googleApi": {
+          "id": "clinicTriageGsa1",
+          "name": "Google Service Account account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Seed demo data": {
+      "main": [
+        [
+          {
+            "node": "Plan demo data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan demo data": {
+      "main": [
+        [
+          {
+            "node": "Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reply": {
+      "main": [
+        [
+          {
+            "node": "Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split": {
+      "main": [
+        [
+          {
+            "node": "Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route": {
+      "main": [
+        [
+          {
+            "node": "Create appointment",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Waitlist row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Waitlist row": {
+      "main": [
+        [
+          {
+            "node": "Append to Waitlist",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Africa/Lagos"
+  },
+  "active": false,
+  "tags": []
+}
