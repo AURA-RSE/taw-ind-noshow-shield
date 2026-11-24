@@ -8,7 +8,11 @@ set -u
 P3="$HOME/Downloads/p3-triage"; P4="$HOME/Documents/taw-ind-trackline-bot"; DIR="$HOME/Documents/taw-ind-noshow-shield"
 export PATH="$P3/local-n8n/tools/node/bin:$PATH"
 node -v | grep -q '^v24' || { echo "Node 24 not found ($P3/local-n8n/tools). Run the P3 launcher once first."; exit 1; }
-if [ -d "$DIR/.git" ]; then git -C "$DIR" pull -q; else gh repo clone AURA-RSE/taw-ind-noshow-shield "$DIR" -- -q || exit 1; fi
+[ -d "$DIR/.git" ] || gh repo clone AURA-RSE/taw-ind-noshow-shield "$DIR" -- -q || exit 1
+git -C "$DIR" fetch -q origin
+# Until the PR is merged the code lives on the feature branch.
+if git -C "$DIR" rev-parse -q --verify origin/feature/noshow-shield >/dev/null && ! git -C "$DIR" merge-base --is-ancestor origin/feature/noshow-shield origin/main; then git -C "$DIR" checkout -q feature/noshow-shield 2>/dev/null || git -C "$DIR" checkout -q -b feature/noshow-shield origin/feature/noshow-shield; fi
+git -C "$DIR" pull -q
 cd "$DIR" || exit 1
 umask 077
 touch .env
